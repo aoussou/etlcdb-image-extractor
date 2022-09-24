@@ -38,7 +38,12 @@ Usage
 ```
     python etl_extractor.py
 ```
-   You can know options for execution using `--help` option
+   
+
+6. You can know options for execution using `--help` option. Example:
+```
+    python etl_extractor.py --save_format=jpg --save_subfolder_name=char
+```
 
 Note: tested only on Ubuntu16.04 + Python3.6 environment
 

@@ -1,11 +1,10 @@
 #! /usr/bin/env python3
-#! -*- coding: utf-8 -*-
+# ! -*- coding: utf-8 -*-
 
 import os, struct, argparse
 from PIL import Image
 import fsutils
 from unicodeutils import UnicodeUtils
-
 
 DEF_YAML_PATH = './etl_data_def.yml'
 DATA_DIR_ROOT = './etl_data'
@@ -18,7 +17,7 @@ def _read_record(f, data_format):
 
     charcode_idx = data_format['char_code_index']
     img_data_idx = data_format['image_data_index']
-    reso      = data_format['resolution']
+    reso = data_format['resolution']
     bit_depth = data_format['bit_depth']
     char_code = r[charcode_idx]
     img = Image.frombytes('F', reso, r[img_data_idx], 'bit', bit_depth)
@@ -42,8 +41,14 @@ def _convert_img(img):
     return ret
 
 
-def extract_info(data_name, data_format, is_hiragana = False, save_same_dir = False):
-
+def extract_info(
+        data_name,
+        data_format,
+        is_hiragana=False,
+        save_same_dir=False,
+        save_format="png",
+        save_subfolder_name="hex"
+):
     '''
         data_foramt['char_set'] should be either 'JIS_X_0208', 'JIS_X_0201' or 'CO-59'
     '''
@@ -71,7 +76,7 @@ def extract_info(data_name, data_format, is_hiragana = False, save_same_dir = Fa
         filesize = os.path.getsize(filepath)
         if filesize % rec_size > 0:
             message = 'File size "{}" or record size "{}" is invalid in {}'.format(
-                    filesize, rec_size, filepath)
+                filesize, rec_size, filepath)
             raise Exception(message)
 
         with open(filepath, 'rb') as f:
@@ -92,10 +97,12 @@ def extract_info(data_name, data_format, is_hiragana = False, save_same_dir = Fa
                     unicode_hex = '0x{:04x}'.format(ord(char_str), 16)
 
                 ## for debug
-                #print(char_str, unicode_hex, record_idx)
-
-                save_dir = '{}/{}'.format(output_dir, unicode_hex)
-                img_filepath = '{}/{}{:06d}.png'.format(save_dir, file_prefix, record_idx)
+                # print(char_str, unicode_hex, record_idx)
+                if save_subfolder_name == "hex":
+                    save_dir = '{}/{}'.format(output_dir, unicode_hex)
+                elif save_subfolder_name == "char":
+                    save_dir = '{}/{}'.format(output_dir, char_str)
+                img_filepath = '{}/{}{:06d}.{}'.format(save_dir, file_prefix, record_idx, save_format)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                     fsutils.write_file(char_str, '{}/.char.txt'.format(save_dir))
@@ -103,8 +110,6 @@ def extract_info(data_name, data_format, is_hiragana = False, save_same_dir = Fa
 
                 record_idx += 1
 
-                ## for debug
-                #print(char_str, unicode_hex, record_idx)
 
             print('extracted {} images from file {}.'.format(record_idx, filepath))
 
@@ -112,16 +117,23 @@ def extract_info(data_name, data_format, is_hiragana = False, save_same_dir = Fa
         print('******************************* \n')
 
 
-def main(data_sets, save_same_dir=False):
+def main(data_sets, save_same_dir=False, save_format="png", save_subfolder_name="hex"):
     etl_def = fsutils.read_yaml(DEF_YAML_PATH)
     for data_set_idx in data_sets:
         idx = data_set_idx - 1
         data_set_def = etl_def['data_set_def'][idx]
-        data_name    = data_set_def['data_name']
-        format_name  = data_set_def['data_format']
-        is_hiragana  = ('is_hiragana' in data_set_def and data_set_def['is_hiragana'])
-        data_format  = etl_def['data_format_def'][format_name]
-        extract_info(data_name, data_format, is_hiragana, save_same_dir)
+        data_name = data_set_def['data_name']
+        format_name = data_set_def['data_format']
+        is_hiragana = ('is_hiragana' in data_set_def and data_set_def['is_hiragana'])
+        data_format = etl_def['data_format_def'][format_name]
+        extract_info(
+            data_name,
+            data_format,
+            is_hiragana,
+            save_same_dir,
+            save_format,
+            save_subfolder_name
+        )
 
 
 if __name__ == '__main__':
@@ -133,5 +145,11 @@ if __name__ == '__main__':
                         help=('save images in one directory, ' +
                               'or divide it to each data set directory. ("False" in default)'))
 
+    parser.add_argument('--save_format', type=str, default="png",
+                        help='image file format (.jpg, .png...)')
+
+    parser.add_argument('--save_subfolder_name', type=str, default="hex",
+                        help='name the subfolder the same as the character itself or as its hex equivalent')
+
     args = parser.parse_args()
-    main(args.data_sets, args.save_same_dir)
+    main(args.data_sets, args.save_same_dir, args.save_format, args.save_subfolder_name)
